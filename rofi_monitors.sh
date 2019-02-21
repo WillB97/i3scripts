@@ -1,10 +1,67 @@
 #!/bin/bash
-## Version 1.3.2
+## Version 1.4
 # Script using rofi to manage xrandr and save and restore monitor layouts
 
 XRANDR=$(which xrandr)
 
 LAPTOP_MON='eDP1'
+
+if [ ! -z layouts.conf ]; then
+	touch layouts.conf
+fi
+
+function non_interactive_display() {
+	case "$1" in
+		"reset" ) ${XRANDR} | # Build xrandr command disabling all active external displays and setting laptop screen to primary
+			awk -v Laptop="$LAPTOP_MON" 'BEGIN{cmd="--output " Laptop " --auto --primary";}
+				($1 != Laptop) && /axis/ {cmd=cmd " --output " $1 " --off"} 
+				END{print cmd}' | xargs -I % sh -c "${XRANDR} %";;
+		"list" )
+			awk '{match($0,"#(.*)$",DATA); print  DATA[1]}' < layouts.conf;;
+		"save" )
+			[ -z "$2" ]&& echo "Invalid name" && exit 0
+			${XRANDR} | awk -v NAME="$2" '
+			BEGIN {cmd=""}
+			END {print cmd " #" NAME}
+			($2 != "connected")|| $0 !~ /mm/ {next}
+			/primary/ {
+				split($4,pos,"+");
+				cmd=cmd " --output " $1 " --auto --primary --pos " pos[2] "x" pos[3]; next
+			}
+			{
+				split($3,pos,"+");
+				cmd=cmd " --output " $1 " --auto --primary --pos " pos[2] "x" pos[3]; next
+			}' >> layouts.conf;;
+		"restore" )
+			CUSTOM_LAYOUTS=( "$(<layouts.conf)" ) # fetch custom layouts from file
+			if [[ `grep -E "#$2\$" layouts.conf | wc -l` != "1" ]]; then
+				echo "Invalid layout"
+			fi
+			echo "$2" | awk -v MONS="$( ${XRANDR} | awk '/axis/{ print $1 }' )" '
+			{
+				cmd="";
+				print $0;
+				print MONS;
+				split(MONS, MON_LIST, /[[:space:]]/);
+				for(i in MON_LIST) {
+					if($0 !~ MON_LIST[i]) {
+						cmd=cmd " --output " MON_LIST[i] " --off "
+					}
+				}
+				print cmd $0
+			}' | xargs -I % sh -c "${XRANDR} %";; # execute layout command & disable unused displays
+		* ) echo "Usage: $0 [reset|list|save|restore]"
+			echo "  reset           reset to laptop display only"
+			echo "  list            list saved layouts"
+			echo "  save <name>     save current layout with name"
+			echo "  restore <name>  restore layout by name";;
+	esac
+}
+
+if [ "$1" != "" ]; then
+	non_interactive_display $@
+	exit 0
+fi
 
 function gen_primary_list() {
 	echo "0 Close"
@@ -52,7 +109,6 @@ function gen_custom_layout_list() {
 
 function set_custom_layout() {
 	CUSTOM_LAYOUTS=( "$(<layouts.conf)" ) # fetch custom layouts from file
-	echo "${CUSTOM_LAYOUTS[$1]}"
 	echo "${CUSTOM_LAYOUTS[$1]}" | awk -v MONS="$( ${XRANDR} | awk '/axis/{ print $1 }' )" '
 	{
 		cmd="";
