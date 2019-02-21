@@ -72,17 +72,11 @@ function gen_primary_list() {
 }
 
 function gen_active_monitors_list() {
-	ACTIVE_MON=( $( ${XRANDR} | awk '( $2 == "connected" ) && /mm/ { print $1 }' ) ) # generate list of displays that have an active resolution
-	for i in $(seq 0 $((${#ACTIVE_MON[@]}-1))); do # print list with index prepended
-		echo "$i ${ACTIVE_MON[i]}"
-	done
+	${XRANDR} | awk 'BEGIN{i=0;} ( $2 == "connected" ) && /mm/ { print i++ " " $1 }' # generate list of displays that have an active resolution
 }
 
 function gen_available_monitor_list() {
-	AVAIL_MON=( $( ${XRANDR} | awk '( $2 == "connected" ){ print $1 }' ) ) # generate list of displays that have an available resolutions
-	for i in $(seq 0 $((${#AVAIL_MON[@]}-1))); do # print list with index prepended
-		echo "$i ${AVAIL_MON[i]}"
-	done
+	${XRANDR} | awk ' BEGIN{i=0;} ( $2 == "connected" ){ print i++ " " $1 }' # generate list of displays that have an available resolutions
 }
 
 function gen_dir_list() {
