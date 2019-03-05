@@ -4,7 +4,9 @@
 
 XRANDR=$(which xrandr)
 
-LAPTOP_MON='Virtual1'
+cd $(dirname "$0")
+
+LAPTOP_MON='eDP1'
 
 if [ ! -z layouts.conf ]; then
 	touch layouts.conf
