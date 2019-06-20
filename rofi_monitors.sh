@@ -78,7 +78,7 @@ function gen_active_monitors_list() {
 }
 
 function gen_available_monitor_list() {
-	${XRANDR} | awk ' BEGIN{i=0;} ( $2 == "connected" ){ print i++ " " $1 }' # generate list of displays that have an available resolutions
+	${XRANDR} | awk ' BEGIN{i=0;} ( $2 == "connected" ) && /mm/ { print i++ " " $1 " *"; next } ( $2 == "connected" ) { print i++ " " $1} ' # generate list of displays that have an available resolutions
 }
 
 function gen_dir_list() {
@@ -125,7 +125,7 @@ function create_custom_layout() {
 	}
 	{
 		split($3,pos,"+");
-		cmd=cmd " --output " $1 " --auto --primary --pos " pos[2] "x" pos[3]; next
+		cmd=cmd " --output " $1 " --auto --pos " pos[2] "x" pos[3]; next
 	}' >> layouts.conf
 }
 
