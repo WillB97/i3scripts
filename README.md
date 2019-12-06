@@ -23,6 +23,12 @@ Handles complex layouts through adding and removing of individual displays and a
 
 Also includes functionality to save and restore layouts an set primary monitors.
 
+__To add__
+- Centered Below
+- Center left & right
+- mirror
+- mirror to all for debugging
+
 ### xrandr_center.sh
 A simplified script that doesn't require rofi and simply places 2 monitors centrally one above the other.
 This can be done interactively or directly at the command line.
@@ -34,6 +40,29 @@ A helper script that is run at resume from sleep to handle a thinkpad being resu
 A script to extract your i3 keybindings from the config file and present them in a searchable menu, including under non-default modes.
 Also supports executing the selected command by pressing enter.
 
+### rofi_i3_name.sh
+A script that uses rofi to set the name of i3 workspaces.
+
+In order for workspace shortcuts to work with named workspaces the shortcuts need to be in the form `workspace number 2`
+
+### rofi_i3_ws.sh
+A rofi driven menu for switching workspaces and moving containers to workspaces
+
+### i3_mirror.sh
+A simple script to mirror the display across all the connected displays
+
+### rofi-power.sh & powermenu.rasi
+A stylised rofi power menu
+
+### fzr.sh
+An improved REPL based on fzf, inspired by https://github.com/DanielFGray/fzf-scripts/blob/master/fzrepl
+
+### i3_float_vid.sh
+A script that uses i3-msg and jq to move a window to a scratchpad then size and position it in the bottom-right corner.
+Also handles moving the window to the other corners of the display.
+
+Useful for having a floating video window that can be easily hidden or moved when needed.
+
 ### Other configs in dotfiles
 #### 30-touchpad.conf
 When added to `/etc/X11/xorg.conf.d/` adds tap to click and natural scrolling.
@@ -44,3 +73,7 @@ During my first year of university we had to program an Atmel AVR microcontrolle
 By default this produces a USB device owned by root so sudo is needed to flash new firmware.
 
 By placing this script in `/etc/udev/rules.d/` the device will be owned by the group `uucp` which also owns the serial ports on Arch Linux based distributions. 
+
+#### rofi.config
+An example rofi config with the solarized theme, a preset modi list, a combination modi of drun and the open window list.
+Also displays the icons of programs and disables the mode label in combi mode.
