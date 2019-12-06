@@ -2,6 +2,24 @@
 ## Version 1.4
 # Script using rofi to manage xrandr and save and restore monitor layouts
 
+## improvements to make
+# move main screen options to functions
+# prevent removing last display
+# skip add display if only one available
+# add direction options
+# 	left
+#	right
+#	above center
+#	below center
+#	left center
+#	right center
+#	mirror
+#	above
+#	below
+#	separate?
+# allow layout.conf location to be set by environment variable
+# add mirror-all cli option
+
 XRANDR=$(which xrandr)
 
 cd $(dirname "$0")
@@ -130,7 +148,7 @@ function create_custom_layout() {
 }
 
 while [[ true ]]; do
-	SEL=$( gen_primary_list | rofi -dmenu -p "Monitor Setup" -a 0 -no-custom  | awk '{print $1}' )
+	SEL=$( gen_primary_list | rofi -auto-select -dmenu -p "Monitor Setup" -a 0 -no-custom  | awk '{print $1}' )
 
 	case $SEL in
 		0) exit 0;;
@@ -143,12 +161,12 @@ while [[ true ]]; do
 			contains "$(gen_active_monitors_list)" $MON1 # catch invalid input, such as people pressing <esc>
 			if [[ ! "$?" ]]||[[ -z "$MON1" ]]; then continue; fi
 			${XRANDR} --output $MON1 --off;; # Disable selected display
-		3) MON1=$( gen_available_monitor_list | rofi -dmenu -p "Add Monitor" -a 0 -no-custom | awk '{print $2}' )
+		3) MON1=$( gen_available_monitor_list | rofi -auto-select -dmenu -p "Add Monitor" -a 0 -no-custom | awk '{print $2}' )
 			contains "$(gen_available_monitor_list)" $MON1 # catch invalid input, such as people pressing <esc>	
 			if [[ ! "$?" ]]||[[ -z "$MON1" ]]; then continue; fi
-			DIR=$( gen_dir_list | rofi -dmenu -p "Select direction" -a 0 -no-custom | awk '{print $1}' )
+			DIR=$( gen_dir_list | rofi -auto-select -dmenu -p "Select direction" -a 0 -no-custom | awk '{print $1}' )
 			if [[ -z "$DIR" ]]||[ ! "$DIR" -ge 1 -a "$DIR" -le 5 ]; then continue; fi # catch invalid input, such as people pressing <esc>
-			MON2=$( gen_active_monitors_list | rofi -dmenu -p "Monitor next to" -a 0 -no-custom | awk '{print $2}' )
+			MON2=$( gen_active_monitors_list | rofi -auto-select -dmenu -p "Monitor next to" -a 0 -no-custom | awk '{print $2}' )
 			contains "$(gen_active_monitors_list)" $MON2 # catch invalid input, such as people pressing <esc>
 			if [[ ! "$?" ]]||[[ -z "$MON2" ]]; then continue; fi
 			case $DIR in
@@ -186,11 +204,11 @@ while [[ true ]]; do
 						}
 					' | xargs -I % sh -c "${XRANDR} %"
 			esac;;
-		4) MON2=$( gen_active_monitors_list | rofi -dmenu -p "Primary Monitor" -a 0 -no-custom | awk '{print $2}' )
+		4) MON2=$( gen_active_monitors_list | rofi -auto-select -dmenu -p "Primary Monitor" -a 0 -no-custom | awk '{print $2}' )
 			contains $(gen_active_monitors_list) $MON2 # catch invalid input, such as people pressing <esc>
 			if [[ ! "$?" ]]||[[ -z "$MON2" ]]; then continue; fi
 			${XRANDR} --output "$MON2" --primary;;
-		5) LAYOUT=$( gen_custom_layout_list | rofi -dmenu -p "Select Layout" -a 0 -no-custom | awk '{print $1}' )
+		5) LAYOUT=$( gen_custom_layout_list | rofi -auto-select -dmenu -p "Select Layout" -a 0 -no-custom | awk '{print $1}' )
 			if [[ -z "$LAYOUT" ]]||[ ! "$LAYOUT" -ge 1 -a "$LAYOUT" -lt "$(cat layouts.conf|wc -l)" ]; then continue; fi # catch invalid input, such as people pressing <esc>
 			set_custom_layout $LAYOUT
 			exit 0;;

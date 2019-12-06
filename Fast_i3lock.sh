@@ -1,5 +1,6 @@
 #!/bin/sh
 # Improved blurlock using ffmpeg for faster lock times
+if [[ `pgrep i3lock` ]]; then exit 0; fi
 
 # get the X canvas size
 screensize=`xdpyinfo | grep -i dimensions: | sed 's/[^0-9]*pixels.*(.*).*//' | sed 's/[^0-9x]*//'`
