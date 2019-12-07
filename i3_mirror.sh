@@ -1,8 +1,11 @@
 #! /bin/bash
-xrandr |
-	awk 'BEGIN{internal=""}
-	/^e/{internal=$1;
-		system("xrandr --output " $1 " --auto --primary");
-		next}
-	($2 == "connected") {print " --output " $1 " --auto --same-as " internal}' |
-	xargs -I % sh -c 'xrandr %'
+xrandr $(xrandr --query| awk -v internal="$internal_display" 'BEGIN{i=0}
+	/^e/{if(internal==""){internal=$1; next}}
+	($2 == "connected") {if($1 == internal)next;outputs[i] = $1;i+=1}
+	END{
+		printf "--output %s --auto --primary ", internal;
+		for(x in outputs){
+			printf "--output %s --auto --same-as %s ", outputs[x], internal;
+		}
+		printf "\n"
+	}')
