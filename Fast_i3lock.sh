@@ -1,39 +1,20 @@
 #!/bin/sh
 # Improved blurlock using ffmpeg for faster lock times
-if [[ `pgrep i3lock` ]]; then exit 0; fi
+
+# Don't add a lock screen if one is already running
+if pgrep -x i3lock; then exit 0; fi
 
 # get the X canvas size
-screensize=`xdpyinfo | grep -i dimensions: | sed 's/[^0-9]*pixels.*(.*).*//' | sed 's/[^0-9x]*//'`
-screensizecolon=`echo $screensize | sed 's/x/:/'`
+screensize=( `xdpyinfo | awk '/dimensions/{size=$2; sub("x",":",$2);print size FS $2}'` )
 # How much you want to shrink it (multiplies by 1/scale)
 scale='10.00'
+down_filter="area" # filter used while downscaling the image (see ffmpeg_tests)
+up_filter="area" # filter used while scaling the image back up to full-size
 
-# 'nearest neighbor' resize, creates a pixelly thing
-# speed: 0.5s
-# downscales in nearest neighbor mode, upscales in nearest neighbor
-
-#ffmpeg -loglevel 0 -y -f x11grab -s $screensize -i $DISPLAY -vframes 1 -filter_complex \
-#    "[0]scale=iw/$scale:ih/$scale:flags=neighbor[v];
-#     [v]scale=$screensizecolon:flags=neighbor" \
-#    /tmp/screen_locked.png
-
-# 'nearest neighbor' resize, creates a pixelly thing
-# speed: 0.6s
-# downscales in bilinear mode, upscales in nearest neighbor
-
-#ffmpeg -loglevel 0 -y -f x11grab -s $screensize -i $DISPLAY -vframes 1 -filter_complex \
-#    "[0]scale=iw/$scale:ih/$scale:flags=bilinear[v];
-#     [v]scale=$screensizecolon:flags=neighbor" \
-#    /tmp/screen_locked.png
-
-# 'area' resize:
-# speed: 0.7s
-# This one produces a blur using fast_bilinear
-
-ffmpeg -loglevel 0 -y -f x11grab -s $screensize -i $DISPLAY -vframes 1 -filter_complex\
-    "[0]scale=iw/$scale:ih/$scale[v];
-     [v]scale=$screensizecolon[out]" \
-    -map "[out]" -sws_flags fast_bilinear /tmp/screen_locked.png
+ffmpeg -loglevel 0 -y -f x11grab -s ${screensize[0]} -i $DISPLAY -vframes 1 -filter_complex \
+   "[0]scale=iw/${scale}:ih/${scale}:flags=$down_filter[v];
+    [v]scale=${screensize[1]}:flags=$up_filter" \
+   /tmp/screen_locked.png
 
 # Lock
 i3lock -i /tmp/screen_locked.png
