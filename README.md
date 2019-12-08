@@ -20,14 +20,15 @@ Handles complex layouts through adding and removing of individual displays and a
 - Above
 - Below
 - Centered Above
-
-Also includes functionality to save and restore layouts an set primary monitors.
-
-__To add__
 - Centered Below
 - Center left & right
-- mirror
+- Mirror
+
+Also includes functionality to save and restore layouts and set primary monitors.
+
+__To add__
 - mirror to all for debugging
+- Handling setting and storing non-preferred display modes
 
 ### xrandr_center.sh
 A simplified script that doesn't require rofi and simply places 2 monitors centrally one above the other.
