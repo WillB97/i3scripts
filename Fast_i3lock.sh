@@ -12,9 +12,9 @@ down_filter="area" # filter used while downscaling the image (see ffmpeg_tests)
 up_filter="area" # filter used while scaling the image back up to full-size
 
 ffmpeg -loglevel 0 -y -f x11grab -s ${screensize[0]} -i $DISPLAY -vframes 1 -filter_complex \
-   "[0]scale=iw/${scale}:ih/${scale}:flags=$down_filter[v];
+    "[0]scale=iw/${scale}:ih/${scale}:flags=$down_filter[v];
     [v]scale=${screensize[1]}:flags=$up_filter" \
-   /tmp/screen_locked.png
+    /tmp/screen_locked.png
 
 # Lock
 i3lock -i /tmp/screen_locked.png

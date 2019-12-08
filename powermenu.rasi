@@ -8,23 +8,23 @@
 }
 
 #window {
-  width: 1200px;
-  height: 200px;
-  border-radius: 5px;
-  children: [ horibox ];
+    width: 1200px;
+    height: 200px;
+    border-radius: 5px;
+    children: [ horibox ];
 }
 #horibox {
-  orientation: horizontal;
-  children: [ listview ];
+    orientation: horizontal;
+    children: [ listview ];
 }
 #listview {
-  layout: horizontal;
+    layout: horizontal;
 }
 #element {
-  padding: 50px 49px 0px ;
+    padding: 50px 49px 0px ;
 }
 #element selected {
-  text-color: #81a1c1;
+    text-color: #81a1c1;
 }
 
 
