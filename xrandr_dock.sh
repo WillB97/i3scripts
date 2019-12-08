@@ -1,26 +1,27 @@
 #! /bin/bash
-# switch between internal and external displays when docking
+# switch between internal and external displays when waking on a dock
+
 XRANDR="$(which xrandr)"
+XRANDR_STATE="$(${XRANDR} --query)"
+
 # check if lid is closed
-if `awk '($2 == "open"){exit 1}' < /proc/acpi/button/lid/LID/state`; then
-	if [[ `${XRANDR} |
-		awk '($2 == "connected")&&($1 != "eDP1")&&/mm/ {print $1}' |
-		wc -l` != "0" ]]; then # if other displays are setup
-		exit 0
-	fi
-	if [[ `${XRANDR} | awk '($2 == "connected")&&($1 != "eDP1"){print $1}' |
-		wc -l` != "0" ]]; then # check if external displays are connected
-		# enable first external display and turn off laptop display
-	 	${XRANDR} --output $(${XRANDR} | awk '($2 == "connected")&&
-	 		($1 != "eDP1"){print $1;exit 0}') --auto --primary --output eDP1 --off
+if `awk '($2 == "open"){exit 1}' /proc/acpi/button/lid/LID/state`; then
+	# check if external monitors are connected
+	if ! `awk '($2=="connected")&&($1!="eDP1"){exit 1}' <<< "$XRANDR_STATE"`; then
+		# check if no external monitors are setup
+		if `awk '($2=="connected")&&($1!="eDP1")&&/[0-9]+mm/{exit 1}' <<< "$XRANDR_STATE"`; then
+			# disable internal display and output on first external display
+			${XRANDR} --output $(awk '($2=="connected")&&($1!="eDP1")&&$0!~/[0-9]+mm/
+			{print $1;exit 0}' <<< "$XRANDR_STATE") --auto --primary --output eDP1 --off
+		fi
 	fi
 else
-	# check if no external displays and not already configured
-	# if external displays are not connected and the laptop display is not the only active display
-	if [[ `${XRANDR} | awk '($2 == "connected")&&($1 != "eDP1"){print $1}' | wc -l` == "0" ]]&&
-		[[ `${XRANDR} | awk '/connected/&&/mm/{print $1} /unknown/{print $1}'` != "eDP1" ]]; then 
-		${XRANDR} | awk 'BEGIN{cmd=""}
+	if ! `awk '($2=="connected")&&($1=="eDP1")&&$0!~/mm/{exit 1} # check if laptop display is not setup
+			/disconnected/&&/mm/&&($1!="eDP1"){exit 1}           # check if for disconnected active displays
+			/unknown/{exit 1}' <<< "$XRANDR_STATE"`; then        # check for displays in an unknown state
+		# disable external displays and setup internal display
+		${XRANDR} --output eDP1 --auto --primary $(awk 'BEGIN{cmd=""}
 			/axis/&&($1 !="eDP1"){cmd=cmd "--output " $1 " --off "}
-			END{print cmd}' | xargs -I % sh -c "${XRANDR} --output eDP1 --auto --primary %"
+			END{print cmd}' <<< "$XRANDR_STATE")
 	fi
 fi
