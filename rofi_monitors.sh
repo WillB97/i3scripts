@@ -1,45 +1,40 @@
 #!/bin/bash
-## Version 1.4
+## Version 1.5
 # Script using rofi to manage xrandr and save and restore monitor layouts
 
 ## improvements to make
-# move main screen options to functions
-# prevent removing last display
 # skip add display if only one available
+# add layout custom mode option?
+# display info about custom layouts?
 # add direction options
-# 	left
-#	right
-#	above center
-#	below center
-#	left center
-#	right center
-#	mirror
-#	above
-#	below
-#	separate?
-# allow layout.conf location to be set by environment variable
+#	left/right rotated (bottom aligned)
 # add mirror-all cli option
+# store non-prefered modes in layouts
+# reduce xrandr calls
 
 XRANDR=$(which xrandr)
 
 cd $(dirname "$0")
 
-LAPTOP_MON='eDP1'
+LAPTOP_MON="${LAPTOP_MON:-eDP1}"
+LAYOUT_FILE="${LAYOUT_FILE:-layouts.conf}"
 
-if [ ! -z layouts.conf ]; then
-    touch layouts.conf
+if [ ! -z "$LAYOUT_FILE" ]; then
+    touch "$LAYOUT_FILE"
 fi
+
+function contains() { # test if the string in $2 exists in the list $1
+    [[ "$1" =~ [[:digit:]]+[[:space:]]"$2"($|[[:space:]]) ]] && return 0 || return 1
+}
 
 function non_interactive_display() {
     case "$1" in
-        "reset" ) ${XRANDR} | # Build xrandr command disabling all active external displays and setting laptop screen to primary
-            awk -v Laptop="$LAPTOP_MON" 'BEGIN{cmd="--output " Laptop " --auto --primary";}
-                ($1 != Laptop) && /axis/ {cmd=cmd " --output " $1 " --off"} 
-                END{print cmd}' | xargs -I % sh -c "${XRANDR} %";;
+        "reset" ) set_laptop_only;;
         "list" )
-            awk '{match($0,"#(.*)$",DATA); print  DATA[1]}' layouts.conf;;
+            awk '{match($0,"#(.*)$",DATA); print  DATA[1]}' "$LAYOUT_FILE";;
         "save" )
             [ -z "$2" ]&& echo "Invalid name" && exit 0
+            contains "$(gen_custom_layout_list)" "$2" && echo "'$2' has already been used" && exit 0
             ${XRANDR} | awk -v NAME="$2" '
             BEGIN {cmd=""}
             END {print cmd " #" NAME}
@@ -51,11 +46,11 @@ function non_interactive_display() {
             {
                 split($3,pos,"+");
                 cmd=cmd " --output " $1 " --auto --primary --pos " pos[2] "x" pos[3]; next
-            }' >> layouts.conf;;
+            }' >> "$LAYOUT_FILE";;
         "restore" )
-            CUSTOM_LAYOUTS=( "$(<layouts.conf)" ) # fetch custom layouts from file
-            if [[ `grep -E "#$2\$" layouts.conf | wc -l` != "1" ]]; then
+            if [[ `grep -E "#$2\$" "$LAYOUT_FILE" | wc -l` != "1" ]]; then
                 echo "Invalid layout"
+                exit 1
             fi
             awk -v MONS="$( ${XRANDR} | awk '/axis/{ print $1 }' )" -v I="$2" '
             ($0 ~ "#" I "$"){
@@ -67,7 +62,7 @@ function non_interactive_display() {
                     }
                 }
                 print cmd $0
-            }' layouts.conf | xargs -I % sh -c "${XRANDR} %";; # execute layout command & disable unused displays
+            }' "$LAYOUT_FILE" | xargs -I % sh -c "${XRANDR} %";; # execute layout command & disable unused displays
         * ) echo "Usage: $0 [reset|list|save|restore]"
             echo "  reset           reset to laptop display only"
             echo "  list            list saved layouts"
@@ -91,35 +86,128 @@ function gen_primary_list() {
     echo "6 Add Custom Layout"
 }
 
-function gen_active_monitors_list() {
-    ${XRANDR} | awk 'BEGIN{i=0;} ( $2 == "connected" ) && /mm/ { print i++ " " $1 }' # generate list of displays that have an active resolution
+function set_laptop_only() {
+    # Build xrandr command disabling all active external displays and setting laptop screen to primary
+    ${XRANDR} --output "$LAPTOP_MON" --auto --primary $(${XRANDR} --query |
+        awk -v Laptop="$LAPTOP_MON" 'BEGIN{cmd=""}
+        /axis/&&($1 != Laptop){cmd=cmd "--output " $1 " --off "}
+        END{print cmd}')
 }
 
-function gen_available_monitor_list() {
-    ${XRANDR} | awk ' BEGIN{i=0;} ( $2 == "connected" ) && /mm/ { print i++ " " $1 " *"; next } ( $2 == "connected" ) { print i++ " " $1} ' # generate list of displays that have an available resolutions
+function gen_active_monitors_list() {
+    # generate list of displays that have an active resolution
+    ${XRANDR} | awk 'BEGIN{i=0;} ($2 == "connected") && /mm/{print i++ " " $1}'
 }
 
 function gen_dir_list() {
     echo "0 Cancel"
     echo "1 Left of"
     echo "2 Right of"
-    echo "3 Above"
-    echo "4 Below"
-    echo "5 Above Centered"
+    echo "3 Above Centered"
+    echo "4 Below Centered"
+    echo "5 Left Centered"
+    echo "6 Right Centered"
+    echo "7 Mirroring"
+    echo "8 Above"
+    echo "9 Below"
+    # echo "A Left Rotated (Bottom Aligned)"
+    # echo "B Right Rotated (Bottom Aligned)"
 }
 
-function contains() { # test if the string in $2 exists in the list $1
-    [[ "$1" =~ [[:digit:]]+[[:space:]]"$2"($|[[:space:]]) ]] && return 0 || return 1
+function gen_available_monitor_list() {
+    # generate list of displays that have an available resolutions
+    ${XRANDR} | awk ' BEGIN{i=0;} /mm/{$1=$1 " *"}
+        ( $2 == "connected" ) {print i++ " " $1}'
+}
+
+function calc_centering() {
+    # run xrandr --dryrun to get display's preferred resolution
+    ${XRANDR} --dryrun --output $1 --auto --output $2 --auto |
+        awk -v DISP1="$1" -v DISP2="$2" -v DIR="$3" '
+        ($6 == "\"" DISP1 "\""){
+            split($3,DISP1size,"x")
+            split($5,DISP1pos,"+")
+        }
+        ($6 == "\"" DISP2 "\""){
+            split($3,DISP2size,"x")
+            split($5,DISP2pos,"+")
+        }
+        END{ # calc dx, dy
+            dx=(DISP1size[1]-DISP2size[1])/2
+            dy=(DISP1size[2]-DISP2size[2])/2
+            # build command for given direction
+            cmd="--output " DISP1 " --auto --output " DISP2 " --auto --pos "
+            if(DIR == "above"){
+                print cmd dx+DISP2pos[1+1] "x" DISP2pos[2+1]-DISP1size[2]
+            } else if(DIR == "below"){
+                print cmd dx+DISP2pos[1+1] "x" DISP2pos[2+1]+DISP2size[2]
+            } else if(DIR == "left"){
+                print cmd DISP2pos[1+1]-DISP1size[1] "x" DISP2pos[2+1]+dy
+            } else if(DIR == "right"){
+                print cmd DISP2pos[1+1]+DISP2size[1] "x" DISP2pos[2+1]+dy
+            }
+        }'
+}
+
+function add_monitor() {
+    MON1=$( gen_available_monitor_list | rofi -auto-select -dmenu -p "Add Monitor" -a 0 -no-custom | awk '{print $2}' )
+    # catch invalid input, such as people pressing <esc>	
+    if [[ -z "$MON1" ]]||(! `contains "$(gen_available_monitor_list)" $MON1`); then continue; fi
+    DIR=$( gen_dir_list | rofi -auto-select -dmenu -p "Select direction" -a 0 -no-custom | awk '{print $1}' )
+    if [[ -z "$DIR" ]]||[ ! "$DIR" -ge 1 -a "$DIR" -le 5 ]; then continue; fi # catch invalid input, such as people pressing <esc>
+    MON2=$( gen_active_monitors_list | rofi -auto-select -dmenu -p "Monitor next to" -a 0 -no-custom | awk '{print $2}' )
+    if [[ -z "$MON2" ]]||( ! `contains "$(gen_active_monitors_list)" $MON2`); then continue; fi
+    case $DIR in
+        0) ;; # do nothing on cancel
+        1) ${XRANDR} --output "$MON1" --auto --left-of "$MON2";; # Left of
+        2) ${XRANDR} --output "$MON1" --auto --right-of "$MON2";; # Right of
+        3) ${XRANDR} $(calc_centering "$MON1" "$MON2" above);; # Above Centered
+        4) ${XRANDR} $(calc_centering "$MON1" "$MON2" below);; # Below Centered
+        5) ${XRANDR} $(calc_centering "$MON1" "$MON2" left);; # Left Centered
+        6) ${XRANDR} $(calc_centering "$MON1" "$MON2" right);; # Right Centered
+        7) ${XRANDR} --output "$MON1" --auto --same-as "$MON2";; # Mirroring
+        8) ${XRANDR} --output "$MON1" --auto --above "$MON2";; # Above
+        9) ${XRANDR} --output "$MON1" --auto --below "$MON2";; # Below
+        [Aa]) ;; # Left Rotated (Bottom Aligned)
+        [Bb]) ;; # Right Rotated (Bottom Aligned)
+    esac
+}
+
+function remove_monitor() {
+    if [[ "$(gen_active_monitors_list|wc -l)" -le 1 ]]; then return; fi # test if this is the last display
+    MON1=$( gen_active_monitors_list | rofi -dmenu -p "Remove Monitor" -a 0 -no-custom | awk '{print $2}' )
+    # catch invalid input, such as people pressing <esc>
+    if [[ -z "$MON1" ]]||( ! `contains "$(gen_active_monitors_list)" $MON1` ); then return; fi
+    ${XRANDR} --output $MON1 --off # Disable selected display
+}
+
+function set_primary() {
+    MON1=$( gen_active_monitors_list | rofi -auto-select -dmenu -p "Primary Monitor" -a 0 -no-custom | awk '{print $2}' )
+    # catch invalid input, such as people pressing <esc>
+    if [[ -z "$MON1" ]]||( ! `contains "$(gen_active_monitors_list)" $MON1` ); then return; fi
+    ${XRANDR} --output "$MON1" --primary
 }
 
 function gen_custom_layout_list() {
-    awk 'BEGIN{i=1;print "0 Cancel"} {match($0,"#(.*)$",DATA); print i++ " " DATA[1]}' layouts.conf # print list with index prepended
+    # print list with index prepended
+    awk 'BEGIN{i=1;print "0 Cancel"} /#/{match($0,"#(.*)$",DATA); print i++ " " DATA[1]}' "$LAYOUT_FILE"
+}
+
+function select_custom_layout() {
+    LAYOUT=$( gen_custom_layout_list | rofi -auto-select -dmenu -p "Select Layout" -a 0 -no-custom |
+        awk '{$1="";sub($1 FS,"");print $0}' )
+    # catch invalid input, such as people pressing <esc>
+    if [[ -z "$LAYOUT" ]]||( `awk -v SEL="$LAYOUT" '($0 ~ "#" SEL){exit 1}' "$LAYOUT_FILE"` ); then return; fi 
+    set_custom_layout "$LAYOUT"
 }
 
 function set_custom_layout() {
-    awk -v MONS="$( ${XRANDR} | awk '/axis/{ print $1 }' )" -v I=$1 '
-    NR==I{
+    mon_list="$( ${XRANDR} | awk '/axis/{ print $1 }' )"
+    # execute layout command & disable unused displays
+    ${XRANDR} $(awk -v MONS="$mon_list" -v I=$1 '
+    ($0 ~ "#" I "$"){
         cmd="";
+        sub(/#.*$/,"")
         split(MONS, MON_LIST, /[[:space:]]/);
         for(i in MON_LIST) {
             if($0 !~ MON_LIST[i]) {
@@ -127,12 +215,16 @@ function set_custom_layout() {
             }
         }
         print cmd $0
-    }' layouts.conf | xargs -I % sh -c "${XRANDR} %" # execute layout command & disable unused displays
+    }' "$LAYOUT_FILE")
 }
 
 function create_custom_layout() {
     NAME=$(rofi -dmenu -p "Enter Layout Name" -theme-str 'listview { enabled: false; }')
     [ -z "$NAME" ]&& return 0
+    if `contains "$(gen_custom_layout_list)" "$NAME"`; then
+        rofi -e "'$NAME' has already been used"
+        return 1
+    fi
     ${XRANDR} | awk -v NAME="$NAME" '
     BEGIN {cmd=""}
     END {print cmd " #" NAME}
@@ -144,7 +236,7 @@ function create_custom_layout() {
     {
         split($3,pos,"+");
         cmd=cmd " --output " $1 " --auto --pos " pos[2] "x" pos[3]; next
-    }' >> layouts.conf
+    }' >> "$LAYOUT_FILE"
 }
 
 while [[ true ]]; do
@@ -152,65 +244,12 @@ while [[ true ]]; do
 
     case $SEL in
         0) exit 0;;
-        1) ${XRANDR} | # Build xrandr command disabling all active external displays and setting laptop screen to primary
-            awk -v Laptop="$LAPTOP_MON" 'BEGIN{cmd="--output " Laptop " --auto --primary";}
-                ($1 != Laptop) && /axis/ {cmd=cmd " --output " $1 " --off"} 
-                END{print cmd}' | xargs -I % sh -c "${XRANDR} %"
+        1) set_laptop_only
             exit 0;;
-        2) MON1=$( gen_active_monitors_list | rofi -dmenu -p "Remove Monitor" -a 0 -no-custom | awk '{print $2}' )
-            contains "$(gen_active_monitors_list)" $MON1 # catch invalid input, such as people pressing <esc>
-            if [[ ! "$?" ]]||[[ -z "$MON1" ]]; then continue; fi
-            ${XRANDR} --output $MON1 --off;; # Disable selected display
-        3) MON1=$( gen_available_monitor_list | rofi -auto-select -dmenu -p "Add Monitor" -a 0 -no-custom | awk '{print $2}' )
-            contains "$(gen_available_monitor_list)" $MON1 # catch invalid input, such as people pressing <esc>	
-            if [[ ! "$?" ]]||[[ -z "$MON1" ]]; then continue; fi
-            DIR=$( gen_dir_list | rofi -auto-select -dmenu -p "Select direction" -a 0 -no-custom | awk '{print $1}' )
-            if [[ -z "$DIR" ]]||[ ! "$DIR" -ge 1 -a "$DIR" -le 5 ]; then continue; fi # catch invalid input, such as people pressing <esc>
-            MON2=$( gen_active_monitors_list | rofi -auto-select -dmenu -p "Monitor next to" -a 0 -no-custom | awk '{print $2}' )
-            contains "$(gen_active_monitors_list)" $MON2 # catch invalid input, such as people pressing <esc>
-            if [[ ! "$?" ]]||[[ -z "$MON2" ]]; then continue; fi
-            case $DIR in
-                0) ;; # do nothing on cancel
-                1) ${XRANDR} --output "$MON1" --auto --left-of "$MON2";;
-                2) ${XRANDR} --output "$MON1" --auto --right-of "$MON2";;
-                3) ${XRANDR} --output "$MON1" --auto --above "$MON2";;
-                4) ${XRANDR} --output "$MON1" --auto --below "$MON2";;
-                5) ${XRANDR} | awk -v MON_UP="$MON1" -v MON_DOWN="$MON2" '
-                        ($1 == MON_UP) {
-                            getline                 # test following line
-                            while (!match($0,"+")){ # find preferred resolution
-                                if($0 ~/^[[:alpha:]]/){ # if no preferred resolution exit
-                                    exit(1)
-                                }
-                                getline
-                            };
-                            split($1,COORDS,"x");   # extract dimensions
-                            TOP_X = COORDS[1];
-                            TOP_Y = COORDS[2];
-                        }
-                        ($1 == MON_DOWN) {
-                            match($0,"[0-9]+x[0-9]+.[0-9]+.[0-9]+",BOT_POS_STR) # find current resolution and offset
-                            split(BOT_POS_STR[0],SIZE_TMP,"+") # extract offset
-                            split(SIZE_TMP[1],SIZE_BOT,"x")    # extract dimensions
-                            BOT_X = SIZE_BOT[1]
-                            BOT_Y = SIZE_BOT[2]
-                            BOT_OFFSET_X = SIZE_TMP[2]
-                            BOT_OFFSET_Y = SIZE_TMP[3]
-                        }
-                        END {
-                            TOP_OFFSET_X = BOT_OFFSET_X-int((TOP_X-BOT_X)/2) # offset X to center X direction
-                            TOP_OFFSET_Y = BOT_OFFSET_Y-TOP_Y                # offset Y to above original display
-                            print "--output " MON_UP " --auto --pos " TOP_OFFSET_X "x" TOP_OFFSET_Y 
-                        }
-                    ' | xargs -I % sh -c "${XRANDR} %"
-            esac;;
-        4) MON2=$( gen_active_monitors_list | rofi -auto-select -dmenu -p "Primary Monitor" -a 0 -no-custom | awk '{print $2}' )
-            contains $(gen_active_monitors_list) $MON2 # catch invalid input, such as people pressing <esc>
-            if [[ ! "$?" ]]||[[ -z "$MON2" ]]; then continue; fi
-            ${XRANDR} --output "$MON2" --primary;;
-        5) LAYOUT=$( gen_custom_layout_list | rofi -auto-select -dmenu -p "Select Layout" -a 0 -no-custom | awk '{print $1}' )
-            if [[ -z "$LAYOUT" ]]||[ ! "$LAYOUT" -ge 1 -a "$LAYOUT" -lt "$(cat layouts.conf|wc -l)" ]; then continue; fi # catch invalid input, such as people pressing <esc>
-            set_custom_layout $LAYOUT
+        2) remove_monitor;;
+        3) add_monitor;;
+        4) set_primary;;
+        5) select_custom_layout
             exit 0;;
         6) create_custom_layout;;
         *) exit 0;; # exit on invalid input in top level menu
