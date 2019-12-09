@@ -64,6 +64,9 @@ Also handles moving the window to the other corners of the display.
 
 Useful for having a floating video window that can be easily hidden or moved when needed.
 
+### i3_tab.sh
+A script that uses jq and i3-msg to do switching to the N-th tab on an i3 workspace
+
 ### Other configs in dotfiles
 #### 30-touchpad.conf
 When added to `/etc/X11/xorg.conf.d/` adds tap to click and natural scrolling.

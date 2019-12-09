@@ -16,7 +16,7 @@
 
 SCALE="${VID_FLOAT_SCALE:-0.4}"
 BUF_X="${VID_FLOAT_BUF_X:-20}"
-BUF_Y="${VID_FLOAT_BUF_Y:-20}"
+BUF_Y="${VID_FLOAT_BUF_Y:-25}"
 
 DISP="$(i3-msg -t get_workspaces | jq -r '.[]|select(.focused==true)|.output')"
 VALS=( $(i3-msg -t get_outputs |
