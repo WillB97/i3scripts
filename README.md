@@ -12,6 +12,12 @@ These all take under a second to enable.
 
 The additionally included suspend<span>@.service file uses systemd to automatically trigger the lockscreen whenever a suspend event occurs.
 
+__Requires:__
+- pgrep
+- xdpyinfo
+- ffmpeg
+- i3lock
+
 ### rofi_monitors.sh
 A script that leverages rofi to provide a menu interface.
 Handles complex layouts through adding and removing of individual displays and alignment including:
@@ -30,33 +36,66 @@ __To add__
 - mirror to all for debugging
 - Handling setting and storing non-preferred display modes
 
+__Requires:__
+- xrandr
+- rofi
+
 ### xrandr_center.sh
 A simplified script that doesn't require rofi and simply places 2 monitors centrally one above the other.
 This can be done interactively or directly at the command line.
 
+__Requires:__
+- xrandr
+
 ### resume<span>@.service & xrandr_dock.sh
 A helper script that is run at resume from sleep to handle a thinkpad being resumed in a dock with the lid closed or having being removed from the dock and returning to the internal display.
+
+__Requires:__
+- xrandr
+- acpi?
 
 ### i3-help.sh
 A script to extract your i3 keybindings from the config file and present them in a searchable menu, including under non-default modes.
 Also supports executing the selected command by pressing enter.
+
+__Requires:__
+- rofi
+- i3-msg
 
 ### rofi_i3_name.sh
 A script that uses rofi to set the name of i3 workspaces.
 
 In order for workspace shortcuts to work with named workspaces the shortcuts need to be in the form `workspace number 2`
 
+__Requires:__
+- rofi
+- i3-msg
+
 ### rofi_i3_ws.sh
 A rofi driven menu for switching workspaces and moving containers to workspaces
+
+__Requires:__
+- i3-msg
+- jq
+- rofi
 
 ### i3_mirror.sh
 A simple script to mirror the display across all the connected displays
 
+__Requires:__
+- xrandr
+
 ### rofi-power.sh & powermenu.rasi
 A stylised rofi power menu
 
+__Requires:__
+- i3exit
+
 ### fzr.sh
 An improved REPL based on fzf, inspired by https://github.com/DanielFGray/fzf-scripts/blob/master/fzrepl
+
+__Requires:__
+- fzf
 
 ### i3_float_vid.sh
 A script that uses i3-msg and jq to move a window to a scratchpad then size and position it in the bottom-right corner.
@@ -64,8 +103,16 @@ Also handles moving the window to the other corners of the display.
 
 Useful for having a floating video window that can be easily hidden or moved when needed.
 
+__Requires:__
+- i3-msg
+- jq
+
 ### i3_tab.sh
 A script that uses jq and i3-msg to do switching to the N-th tab on an i3 workspace
+
+__Requires:__
+- i3-msg
+- jq
 
 ### Other configs in dotfiles
 #### 30-touchpad.conf
